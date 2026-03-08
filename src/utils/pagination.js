@@ -10,5 +10,4 @@ const getPagination = (req) => {
     skip
   };
 };
-
 module.exports = getPagination;
