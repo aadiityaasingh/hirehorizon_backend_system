@@ -1,144 +1,144 @@
-const applicationModel = require("../models/application.model");
+const applicationModel = require("../models/application.model.js");
 const jobModel = require("../models/job.model.js");
 
-const applyJob = async (req, res) => {
-  try {
-    const userId = req.id;
-    const jobId = req.params.id;
+const asyncHandler = require("../middlewares/asyncHandler.js");
+const AppError = require("../utils/appError.js");
+const mongoose = require("mongoose");
+const getPagination = require("../utils/pagination.js");
 
-    if (!jobId) {
-      return res.status(400).json({
-        message: "Job id is required",
-        success: false
-      });
-    }
 
-    const existingApplication = await applicationModel.findOne({
-      job: jobId,
-      applicant: userId
-    });
+const applyJob = asyncHandler(async (req, res) => {
+  const userId = req.id;
+  const jobId = req.params.id;
 
-    if (existingApplication) {
-      return res.status(400).json({
-        message: "You have already applied for this jobs",
-        success: true
-      });
-    }
-
-    const job = await jobModel.findById(jobId);
-    if (!job) {
-      return res.status(400).json({
-        message: "job not found",
-        success: false
-      });
-    }
-
-    const newApplication = await applicationModel.create({
-      job: jobId,
-      applicant: userId
-    });
-
-    job.applications.push(newApplication._id);
-    await job.save();
-
-    return res.status(201).json({
-      message: "Job Applied successfully.",
-      success: true
-    });
-  } catch (error) {
-    console.log(error);
+  if (!jobId) {
+    throw new AppError("Job id is required", 400);
   }
-};
 
-const getAppliedJobs = async (req, res) => {
-  try {
-    const userId = req.id;
+  if (!mongoose.Types.ObjectId.isValid(jobId)) {
+    throw new AppError("Invalid job id", 400);
+  }
 
-    const application = await applicationModel.find({ applicant: userId })
-      .sort({ createdAt: -1 })
-      .populate({
-        path: "job",
-        options: { sort: { createdAt: -1 } },
-        populate: {
-          path: "company",
-          options: { sort: { createdAt: -1 } }
-        }
-      });
+  const existingApplication = await applicationModel.findOne({
+    job: jobId,
+    applicant: userId
+  });
 
-    if (!application) {
-      return res.status(404).json({
-        message: "No Applications",
-        success: false
-      });
-    }
+  if (existingApplication) {
+    throw new AppError("You have already applied for this job", 400);
+  }
 
-    return res.status(200).json({
-      application,
-      success: true
-    });
-  } catch (error) {}
-};
+  const job = await jobModel.findById(jobId);
 
-const getApplicants = async (req, res) => {
-  try {
-    const jobId = req.params.id;
+  if (!job) {
+    throw new AppError("Job not found", 404);
+  }
 
-    const job = await jobModel.findById(jobId).populate({
+  const newApplication = await applicationModel.create({
+    job: jobId,
+    applicant: userId
+  });
+
+  job.applications.push(newApplication._id);
+  await job.save();
+
+  res.status(201).json({
+    message: "Job applied successfully",
+    success: true
+  });
+});
+
+
+const getAppliedJobs = asyncHandler(async (req, res) => {
+
+  const { page, limit, skip } = getPagination(req);
+  const userId = req.id;
+
+  const totalApplications = await applicationModel.countDocuments({
+    applicant: userId
+  });
+
+  const applications = await applicationModel
+    .find({ applicant: userId })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: "job",
+      populate: {
+        path: "company"
+      }
+    })
+    .skip(skip)
+    .limit(limit);
+
+  res.status(200).json({
+    success: true,
+    page,
+    totalPages: Math.ceil(totalApplications / limit),
+    totalApplications,
+    applications
+  });
+
+});
+
+
+const getApplicants = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = getPagination(req);
+  const jobId = req.params.id;
+
+  const job = await jobModel.findById(jobId)
+    .populate({
       path: "applications",
-      options: { sort: { createdAt: -1 } },
+      options: {
+        sort: { createdAt: -1 },
+        skip,
+        limit
+      },
       populate: {
         path: "applicant"
       }
     });
 
-    if (!job) {
-      return res.status(404).json({
-        message: "Job not found",
-        success: false
-      });
-    }
-
-    return res.status(200).json({
-      job,
-      success: true
-    });
-  } catch (error) {
-    console.log(error);
+  if (!job) {
+    throw new AppError("Job not found", 404);
   }
-};
 
-const updateStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-    const applicationId = req.params.id;
+  const totalApplicants = job.applications.length;
 
-    if (!status) {
-      return res.status(400).json({
-        message: "status is required",
-        success: false
-      });
-    }
+  res.status(200).json({
+    success: true,
+    page,
+    totalApplicants,
+    applicants: job.applications
+  });
+});
 
-    const application = await applicationModel.findOne({ _id: applicationId });
 
-    if (!application) {
-      return res.status(404).json({
-        message: "Application not found",
-        success: false
-      });
-    }
+const updateStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const applicationId = req.params.id;
 
-    application.status = status.toLowerCase();
-    await application.save();
-
-    return res.status(200).json({
-      message: "status updated successfully",
-      success: true
-    });
-  } catch (error) {
-    console.log(error);
+  if (!status) {
+    throw new AppError("Status is required", 400);
   }
-};
+
+  if (!mongoose.Types.ObjectId.isValid(applicationId)) {
+    throw new AppError("Invalid application id", 400);
+  }
+
+  const application = await applicationModel.findById(applicationId);
+
+  if (!application) {
+    throw new AppError("Application not found", 404);
+  }
+
+  application.status = status.toLowerCase();
+  await application.save();
+
+  res.status(200).json({
+    message: "Status updated successfully",
+    success: true
+  });
+});
 
 module.exports = {
   applyJob,

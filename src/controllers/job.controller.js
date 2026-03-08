@@ -1,139 +1,144 @@
 const jobModel = require("../models/job.model.js");
 
-const postJob = async (req, res) => {
-  try {
-    const {
-      title,
-      description,
-      requirements,
-      salary,
-      location,
-      jobType,
-      experience,
-      position,
-      companyId,
-    } = req.body;
+const asyncHandler = require("../middlewares/asyncHandler.js");
+const AppError = require("../utils/appError.js");
+const getPagination = require("../utils/pagination.js");
 
-    const userId = req.id;
 
-    if (
-      !title ||
-      !description ||
-      !requirements ||
-      !salary ||
-      !location ||
-      !jobType ||
-      !experience ||
-      !position ||
-      !companyId
-    ) {
-      return res.status(400).json({
-        message: "something is missing",
-        success: false,
-      });
-    }
+const postJob = asyncHandler(async (req, res) => {
+  const {
+    title,
+    description,
+    requirements,
+    salary,
+    location,
+    jobType,
+    experience,
+    position,
+    companyId,
+  } = req.body;
 
-    const job = await jobModel.create({
-      title,
-      description,
-      requirements: requirements.split(","),
-      salary: Number(salary),
-      location,
-      jobType,
-      experienceLevel: experience,
-      position,
-      company: companyId,
-      created_by: userId,
-    });
+  const userId = req.id;
 
-    return res.status(201).json({
-      message: "New job created successfully",
-      job,
-      success: true,
-    });
-  } catch (error) {
-    console.log(error);
+  if (
+    !title ||
+    !description ||
+    !requirements ||
+    !salary ||
+    !location ||
+    !jobType ||
+    !experience ||
+    !position ||
+    !companyId
+  ) {
+    throw new AppError("Something is missing", 400);
   }
-};
 
-const getAllJobs = async (req, res) => {
-  try {
-    const keyword = req.query.keyword || "";
+  const job = await jobModel.create({
+    title,
+    description,
+    requirements: requirements.split(","),
+    salary: Number(salary),
+    location,
+    jobType,
+    experienceLevel: experience,
+    position,
+    company: companyId,
+    created_by: userId,
+  });
 
-    const query = {
-      $or: [
-        { title: { $regex: keyword, $options: "i" } },
-        { description: { $regex: keyword, $options: "i" } },
-      ],
-    };
+  res.status(201).json({
+    message: "New job created successfully",
+    job,
+    success: true,
+  });
+});
 
-    const jobs = await jobModel.find(query)
-      .populate({
-        path: "company",
-      })
-      .sort({ createdAt: -1 });
 
-    if (!jobs) {
-      return res.status(404).json({
-        message: "jobs not found.",
-        success: false,
-      });
-    }
+const getAllJobs = asyncHandler(async (req, res) => {
 
-    return res.status(200).json({
-      jobs,
-      success: true,
-    });
-  } catch (error) {
-    console.log(error);
+  const { page, limit, skip } = getPagination(req);
+
+  const keyword = req.query.keyword || "";
+  const location = req.query.location;
+  const jobType = req.query.jobType;
+
+  const filter = {
+    $and: [
+      {
+        $or: [
+          { title: { $regex: keyword, $options: "i" } },
+          { description: { $regex: keyword, $options: "i" } }
+        ]
+      }
+    ]
+  };
+
+  if (location) {
+    filter.$and.push({ location: { $regex: location, $options: "i" } });
   }
-};
 
-const getJobById = async (req, res) => {
-  try {
-    const jobId = req.params.id;
-
-    const job = await jobModel.findById(jobId).populate({
-      path: "applications",
-    });
-
-    if (!job) {
-      return res.status(404).json({
-        message: "Jobs not found.",
-        success: true,
-      });
-    }
-
-    return res.status(200).json({ job, success: true });
-  } catch (error) {
-    console.log(error);
+  if (jobType) {
+    filter.$and.push({ jobType });
   }
-};
 
-const getAdminJobs = async (req, res) => {
-  try {
-    const adminId = req.id;
+  const totalJobs = await jobModel.countDocuments(filter);
 
-    const jobs = await jobModel.find({ created_by: adminId }).populate({
-      path: "company",
-      createdAt: -1,
-    });
+  const jobs = await jobModel
+    .find(filter)
+    .populate("company")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
-    if (!jobs) {
-      return res.status(404).json({
-        message: "Jobs not found.",
-        success: false,
-      });
-    }
+  res.status(200).json({
+    success: true,
+    page,
+    totalPages: Math.ceil(totalJobs / limit),
+    totalJobs,
+    jobs
+  });
 
-    return res.status(200).json({
-      jobs,
-      success: true,
-    });
-  } catch (error) {
-    console.log(error);
+});
+
+
+const getJobById = asyncHandler(async (req, res) => {
+  const jobId = req.params.id;
+
+  const job = await jobModel.findById(jobId).populate("applications");
+
+  if (!job) {
+    throw new AppError("Job not found", 404);
   }
-};
+
+  res.status(200).json({
+    job,
+    success: true,
+  });
+});
+
+
+const getAdminJobs = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = getPagination(req);
+  const adminId = req.id;
+
+  const totalJobs = await jobModel.countDocuments({ created_by: adminId });
+
+  const jobs = await jobModel
+    .find({ created_by: adminId })
+    .populate("company")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+  res.status(200).json({
+    success: true,
+    page,
+    totalPages: Math.ceil(totalJobs / limit),
+    totalJobs,
+    jobs
+  });
+});
 
 module.exports = {
   postJob,
