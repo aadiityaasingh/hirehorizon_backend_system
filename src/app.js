@@ -23,7 +23,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: "https://hirehorizonfrontendsystem.vercel.app/",
+    origin: "https://hirehorizonfrontendsystem.vercel.app",
     credentials: true
   })
 );
