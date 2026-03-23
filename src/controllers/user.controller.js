@@ -7,8 +7,6 @@ const cloudinary = require("../utils/cloudinary.js");
 const asyncHandler = require("../middlewares/asyncHandler");
 const AppError = require("../utils/appError");
 
-
-
 const register = asyncHandler(async (req, res) => {
   const { fullname, email, phoneNumber, password, role } = req.body;
 
@@ -50,7 +48,6 @@ const register = asyncHandler(async (req, res) => {
   });
 });
 
-
 const login = asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
 
@@ -79,7 +76,7 @@ const login = asyncHandler(async (req, res) => {
   };
 
   const token = jwt.sign(tokenData, process.env.SECRET_KEY, {
-    expiresIn: "1d",
+    expiresIn: "3h",
   });
 
   user = {
@@ -96,7 +93,8 @@ const login = asyncHandler(async (req, res) => {
     .cookie("token", token, {
       maxAge: 1 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "none",
+      secure: true,
     })
     .json({
       message: `Welcome back ${user.fullname}`,
@@ -105,14 +103,12 @@ const login = asyncHandler(async (req, res) => {
     });
 });
 
-
 const logout = asyncHandler(async (req, res) => {
   res.status(200).cookie("token", "", { maxAge: 0 }).json({
     message: "Logout successfully",
     success: true,
   });
 });
-
 
 const updateProfile = asyncHandler(async (req, res) => {
   const { fullname, email, phoneNumber, bio, skills } = req.body;
