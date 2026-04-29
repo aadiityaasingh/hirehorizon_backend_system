@@ -33,9 +33,10 @@ A secure, production-ready RESTful API for a MERN-stack job portal. Built with *
 - 🌐 **404 Handler** — Catches all unmatched routes with a clean error response
 
 ---
-```
+
 ## 📁 Project Structure
 
+```
 hirehorizon-backend/
 ├── src/
 │   ├── config/
@@ -70,8 +71,8 @@ hirehorizon-backend/
 ├── .gitignore
 ├── package.json
 └── server.js                           # Entry point
-
 ```
+
 ---
 
 ## ⚙️ Getting Started
@@ -226,6 +227,33 @@ API_SECRET=your_cloudinary_api_secret
 
 ---
 
+## 🛡 Role-Based Access Control (RBAC)
+
+The system has two roles assigned at registration:
+
+| Role | Description |
+|---|---|
+| `student` | Can browse jobs, apply to jobs, and track their applications |
+| `recruiter` | Can register companies, post jobs, and manage applicants |
+
+| Feature | Student | Recruiter |
+|---|---|---|
+| Register / Login / Logout | ✅ | ✅ |
+| Update Profile | ✅ | ✅ |
+| Browse All Jobs | ✅ | ✅ |
+| Apply to a Job | ✅ | ❌ |
+| View Applied Jobs | ✅ | ❌ |
+| Post a Job | ❌ | ✅ |
+| View Admin Jobs | ❌ | ✅ |
+| Register a Company | ❌ | ✅ |
+| Update Company | ❌ | ✅ |
+| View Applicants | ❌ | ✅ |
+| Update Application Status | ❌ | ✅ |
+
+> Role is set at registration and validated via the `isAuthenticated` middleware on every protected route.
+
+---
+
 ## 🔐 Authentication Flow
 
 1. Register via `POST /api/user/register`
@@ -245,11 +273,7 @@ Contributions are welcome!
 4. Push to the branch: `git push origin feature/my-feature`
 5. Open a Pull Request
 
----
 
-## 📄 License
-
-This project is licensed under the **ISC License**.
 
 ---
 
